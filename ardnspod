@@ -33,7 +33,11 @@ arWanIp() {
 
     case $(uname) in
         'Linux')
-            hostIp=$(ip -o -4 addr list | grep -Ev '\s(docker|lo)' | awk '{print $4}' | cut -d/ -f1 | grep -Ev "$lanIps")
+            #hostIp=$(ip -o -4 addr list | grep -Ev '\s(docker|lo)' | awk '{print $4}' | cut -d/ -f1 | grep -Ev "$lanIps")
+            # arm7l K3 官改获取外网IP方式
+            pppoename=`/sbin/ifconfig |grep ppp |awk '{print $1}'`
+            /sbin/ifconfig $pppoename | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}' >'/tmp/gge-get-newip'
+            hostIp=$(cat /tmp/gge-get-newip)
         ;;
         'Darwin')
             hostIp=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | grep -Ev "$lanIps")
@@ -62,6 +66,9 @@ arDdnsApi() {
     local apiurl="https://dnsapi.cn/${1:?'Info.Version'}"
     local params="login_token=$arToken&format=json&$2"
 
+    $(echo $agnet)
+        echo $params
+                echo $apiurl
     if type wget >/dev/null 2>&1; then
         wget --quiet --no-check-certificate --output-document=- --user-agent=$agent --post-data $params $apiurl
     else
@@ -81,15 +88,21 @@ arDdnsInfo() {
 
     # Get domain ID
     domainId=$(arDdnsApi "Domain.Info" "domain=$1")
+    #echo "arDdnsApi Domain.Info domain=$1  $domainId"
+
     domainId=$(echo $domainId | sed 's/.*"id":"\([0-9]*\)".*/\1/')
+    #echo "domainId== $domainId"
 
     # Get Record ID
-    recordId=$(arDdnsApi "Record.List" "domain_id=$domainId&sub_domain=$2")
+    # 20200410 增加 record_type=A 的过滤条件
+    recordId=$(arDdnsApi "Record.List" "domain_id=$domainId&sub_domain=$2&record_type=A")
     recordId=$(echo $recordId | sed 's/.*"id":"\([0-9]*\)".*/\1/')
+    echo "recordId== $recordId"
 
     # Last IP
     recordIp=$(arDdnsApi "Record.Info" "domain_id=$domainId&record_id=$recordId")
     recordIp=$(echo $recordIp | sed 's/.*,"value":"\([0-9\.]*\)".*/\1/')
+    echo "recordIp== $recordIp"
 
     # Output IP
     case "$recordIp" in
@@ -123,11 +136,14 @@ arDdnsUpdate() {
     domainId=$(echo $domainId | sed 's/.*"id":"\([0-9]*\)".*/\1/')
 
     # Get Record ID
-    recordId=$(arDdnsApi "Record.List" "domain_id=$domainId&sub_domain=$2")
+    # 20200410 增加 record_type=A 的过滤条件
+    recordId=$(arDdnsApi "Record.List" "domain_id=$domainId&sub_domain=$2&record_type=A")
     recordId=$(echo $recordId | sed 's/.*"id":"\([0-9]*\)".*/\1/')
 
-    # Update IP
-    recordRs=$(arDdnsApi "Record.Ddns" "domain_id=$domainId&record_id=$recordId&sub_domain=$2&record_type=A&value=$hostIp&record_line=默认")
+    # Update DDNS IP
+    #recordRs=$(arDdnsApi "Record.Ddns" "domain_id=$domainId&record_id=$recordId&sub_domain=$2&record_type=A&value=$hostIp&record_line=默认")
+    # Update domain Ip
+    recordRs=$(arDdnsApi "Record.Modify" "domain_id=$domainId&record_id=$recordId&sub_domain=$2&record_type=A&value=$hostIp&record_line=默认")
     recordIp=$(echo $recordRs | sed 's/.*,"value":"\([0-9\.]*\)".*/\1/')
     recordCd=$(echo $recordRs | sed 's/.*{"code":"\([0-9]*\)".*/\1/')
 
