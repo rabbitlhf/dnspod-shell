@@ -94,12 +94,12 @@ arDdnsInfo() {
     # 20200410 增加 record_type=A 的过滤条件
     recordId=$(arDdnsApi "Record.List" "domain_id=$domainId&sub_domain=$2&record_type=A")
     recordId=$(echo $recordId | sed 's/.*"id":"\([0-9]*\)".*/\1/')
-    echo "recordId== $recordId"
+    # echo "recordId== $recordId"
 
     # Last IP
     recordIp=$(arDdnsApi "Record.Info" "domain_id=$domainId&record_id=$recordId")
     recordIp=$(echo $recordIp | sed 's/.*,"value":"\([0-9\.]*\)".*/\1/')
-    echo "recordIp== $recordIp"
+    # echo "recordIp== $recordIp"
 
     # Output IP
     case "$recordIp" in
